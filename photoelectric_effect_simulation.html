@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>光電効果シミュレーション - 古典論と実際の対比</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Mequilla, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 10px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: clamp(20px, 5vw, 28px);
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 20px;
+            font-size: clamp(12px, 3vw, 14px);
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .tab {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 10px 10px 0 0;
+            cursor: pointer;
+            font-size: clamp(14px, 3.5vw, 18px);
+            font-weight: bold;
+            transition: all 0.3s;
+            background-color: #ddd;
+            color: #666;
+            touch-action: manipulation;
+        }
+        .tab.active {
+            background-color: white;
+            color: #333;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        .tab.classical.active {
+            color: #1976d2;
+        }
+        .tab.quantum.active {
+            color: #c2185b;
+        }
+        .panel {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .panel.active {
+            display: block;
+        }
+        .panel h2 {
+            text-align: center;
+            margin-top: 0;
+            padding: 12px;
+            border-radius: 5px;
+            font-size: clamp(18px, 4vw, 24px);
+        }
+        .classical-panel h2 {
+            background-color: #e3f2fd;
+            color: #1976d2;
+        }
+        .quantum-panel h2 {
+            background-color: #fce4ec;
+            color: #c2185b;
+        }
+        .canvas-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            max-width: 900px;
+            height: auto;
+            margin: 0 auto;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            background-color: #fafafa;
+            touch-action: none;
+        }
+        .controls {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+            font-size: clamp(14px, 3.5vw, 16px);
+        }
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #ddd;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #1976d2;
+            cursor: pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #1976d2;
+            cursor: pointer;
+            border: none;
+        }
+        .value-display {
+            text-align: center;
+            font-size: clamp(16px, 4vw, 18px);
+            font-weight: bold;
+            color: #1976d2;
+            margin-top: 5px;
+        }
+        .info-box {
+            background-color: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 5px;
+            padding: 12px;
+            margin-top: 15px;
+        }
+        .info-box h3 {
+            margin-top: 0;
+            color: #856404;
+            font-size: clamp(14px, 3.5vw, 16px);
+        }
+        .info-box p {
+            margin: 5px 0;
+            font-size: clamp(12px, 3vw, 14px);
+            color: #856404;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: clamp(14px, 3.5vw, 16px);
+        }
+        .status.emitting {
+            background-color: #c8e6c9;
+            color: #2e7d32;
+        }
+        .status.not-emitting {
+            background-color: #ffcdd2;
+            color: #c62828;
+        }
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 15px;
+            font-size: clamp(11px, 2.5vw, 14px);
+            flex-wrap: wrap;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .legend-color {
+            width: 18px;
+            height: 18px;
+            border-radius: 3px;
+            border: 1px solid #333;
+            flex-shrink: 0;
+        }
+        button {
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: clamp(14px, 3.5vw, 16px);
+            display: block;
+            margin: 15px auto;
+            touch-action: manipulation;
+            min-height: 44px;
+        }
+        button:hover {
+            background-color: #1565c0;
+        }
+        button:active {
+            background-color: #0d47a1;
+        }
+        
+        /* タブレット・スマホ用の調整 */
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+            }
+            .panel {
+                padding: 10px;
+            }
+            .tabs {
+                gap: 5px;
+            }
+            .tab {
+                padding: 10px 15px;
+                font-size: 14px;
+            }
+            .legend {
+                gap: 10px;
+            }
+        }
+        
+        /* 横スクロールを防ぐ */
+        @media (max-width: 600px) {
+            .canvas-container {
+                margin: 0 -10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>光電効果シミュレーション</h1>
+    <div class="subtitle">古典的波動論の予想 vs 実際の光電効果</div>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label for="frequency">光の振動数（色）</label>
+            <input type="range" id="frequency" min="1" max="100" value="30" step="1">
+            <div class="value-display" id="frequencyValue"></div>
+        </div>
+        
+        <div class="control-group">
+            <label for="intensity">光の強度（明るさ）</label>
+            <input type="range" id="intensity" min="1" max="10" value="5" step="1">
+            <div class="value-display" id="intensityValue"></div>
+        </div>
+        
+        <button onclick="resetSimulation()">リセット</button>
+    </div>
+
+    <div class="tabs">
+        <button class="tab classical active" onclick="switchTab('classical')">古典的波動論の予想</button>
+        <button class="tab quantum" onclick="switchTab('quantum')">実際の光電効果</button>
+    </div>
+
+    <div class="panel classical-panel active">
+        <h2>古典的波動論の予想</h2>
+        <div class="canvas-container">
+            <canvas id="classicalCanvas" width="900" height="500"></canvas>
+        </div>
+        <div class="status" id="classicalStatus"></div>
+        <div class="info-box">
+            <h3>予想される挙動：</h3>
+            <p>✓ 電子は電磁波で振動する</p>
+            <p>✓ エネルギーが蓄積される</p>
+            <p>✓ 十分溜まれば放出される</p>
+            <p>✓ 弱い光でも時間をかければ放出</p>
+        </div>
+    </div>
+
+    <div class="panel quantum-panel">
+        <h2>実際の光電効果</h2>
+        <div class="canvas-container">
+            <canvas id="quantumCanvas" width="900" height="500"></canvas>
+        </div>
+        <div class="status" id="quantumStatus"></div>
+        <div class="info-box">
+            <h3>実際の挙動：</h3>
+            <p>✓ 電子は電磁波で振動する</p>
+            <p>✗ 振動数が低いと絶対に放出されない</p>
+            <p>✓ 振動数が閾値を超えると即座に放出</p>
+        </div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #4fc3f7;"></div>
+            <span>入射光（波）</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #666;"></div>
+            <span>金属表面</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #f44336;"></div>
+            <span>金属内電子（振動）</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: linear-gradient(to right, #2196f3, #4caf50, #f44336);"></div>
+            <span>放出電子（速さで色変化）</span>
+        </div>
+    </div>
+
+    <script>
+        const classicalCanvas = document.getElementById('classicalCanvas');
+        const quantumCanvas = document.getElementById('quantumCanvas');
+        const classicalCtx = classicalCanvas.getContext('2d');
+        const quantumCtx = quantumCanvas.getContext('2d');
+        
+        const frequencySlider = document.getElementById('frequency');
+        const intensitySlider = document.getElementById('intensity');
+        const frequencyValue = document.getElementById('frequencyValue');
+        const intensityValue = document.getElementById('intensityValue');
+        const classicalStatus = document.getElementById('classicalStatus');
+        const quantumStatus = document.getElementById('quantumStatus');
+
+        let time = 0;
+        let classicalEnergy = 0;
+        let emittedElectronsClassical = [];
+        let emittedElectronsQuantum = [];
+        
+        const THRESHOLD_FREQUENCY = 60; // 閾値振動数
+        const CLASSICAL_THRESHOLD_ENERGY = 100; // 古典論でのエネルギー閾値
+        
+        // キャンバスのレスポンシブ対応
+        function resizeCanvas() {
+            const container = document.querySelector('.canvas-container');
+            if (!container) return;
+            
+            const containerWidth = container.clientWidth;
+            const scale = Math.min(1, containerWidth / 900);
+            
+            // CSSでのサイズ調整（表示サイズ）
+            classicalCanvas.style.width = (900 * scale) + 'px';
+            classicalCanvas.style.height = (500 * scale) + 'px';
+            quantumCanvas.style.width = (900 * scale) + 'px';
+            quantumCanvas.style.height = (500 * scale) + 'px';
+        }
+        
+        // ページ読み込み時とリサイズ時にキャンバスサイズを調整
+        window.addEventListener('load', resizeCanvas);
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', resizeCanvas);
+        
+        function switchTab(tabName) {
+            // タブの切り替え
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            
+            if (tabName === 'classical') {
+                document.querySelector('.tab.classical').classList.add('active');
+                document.querySelector('.classical-panel').classList.add('active');
+            } else {
+                document.querySelector('.tab.quantum').classList.add('active');
+                document.querySelector('.quantum-panel').classList.add('active');
+            }
+        }
+        
+        function getWavelengthColor(frequency) {
+            // 振動数から色を決定
+            if (frequency < 40) return '#ff0000'; // 赤
+            if (frequency < 50) return '#ff7700'; // オレンジ
+            if (frequency < 60) return '#ffff00'; // 黄
+            if (frequency < 70) return '#00ff00'; // 緑
+            if (frequency < 80) return '#0088ff'; // 青
+            return '#8800ff'; // 紫
+        }
+        
+        function getFrequencyLabel(frequency) {
+            if (frequency < 40) return '赤外線～赤色光（低振動数）';
+            if (frequency < 60) return '可視光（中振動数）';
+            if (frequency < 80) return '青～紫色光（高振動数）';
+            return '紫外線（超高振動数）';
+        }
+        
+        function updateValues() {
+            const freq = parseInt(frequencySlider.value);
+            const intensity = parseInt(intensitySlider.value);
+            
+            frequencyValue.textContent = getFrequencyLabel(freq);
+            intensityValue.textContent = `強度 ${intensity}`;
+        }
+        
+        function drawFlashlight(ctx, x, y, color, intensity, isOn) {
+            // 懐中電灯本体（大きく）
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.moveTo(x, y - 50);
+            ctx.lineTo(x + 80, y - 35);
+            ctx.lineTo(x + 80, y + 35);
+            ctx.lineTo(x, y + 50);
+            ctx.closePath();
+            ctx.fill();
+            
+            // ライトの先端（レンズ部分）
+            ctx.fillStyle = isOn ? color : '#666';
+            ctx.beginPath();
+            ctx.arc(x + 80, y, 35, -Math.PI/2, Math.PI/2);
+            ctx.closePath();
+            ctx.fill();
+            
+            // ライトの光輝（強調）
+            if (isOn) {
+                // 内側の明るい光
+                ctx.fillStyle = color;
+                ctx.globalAlpha = 0.6;
+                ctx.beginPath();
+                ctx.arc(x + 80, y, 30, -Math.PI/2, Math.PI/2);
+                ctx.closePath();
+                ctx.fill();
+                
+                // 外側の光輪
+                ctx.globalAlpha = 0.3;
+                ctx.beginPath();
+                ctx.arc(x + 80, y, 45, -Math.PI/2, Math.PI/2);
+                ctx.closePath();
+                ctx.fill();
+                
+                // 光の広がり（ビーム）
+                ctx.globalAlpha = 0.15;
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.moveTo(x + 80, y - 30);
+                ctx.lineTo(x + 150, y - 40);
+                ctx.lineTo(x + 150, y + 40);
+                ctx.lineTo(x + 80, y + 30);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.globalAlpha = 1.0;
+            }
+            
+            // グリップの詳細
+            ctx.strokeStyle = '#555';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 4; i++) {
+                const gripX = x + 15 + i * 15;
+                ctx.beginPath();
+                ctx.moveTo(gripX, y - 45);
+                ctx.lineTo(gripX, y + 45);
+                ctx.stroke();
+            }
+            
+            // レンズの枠
+            ctx.strokeStyle = '#222';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(x + 80, y, 35, -Math.PI/2, Math.PI/2);
+            ctx.stroke();
+        }
+        
+        function drawWave(ctx, x, frequency, intensity, color, startX) {
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.globalAlpha = 0.3 + (intensity / 15); // 透明度を調整
+            ctx.beginPath();
+            
+            // 振幅を小さくする
+            const amplitude = 10 + intensity * 1.5;
+            const wavelength = 300 / frequency;
+            
+            for (let i = 0; i < 350; i++) {
+                const currentX = startX + i;
+                const y = 100 + amplitude * Math.sin((i + x) * Math.PI * 2 / wavelength);
+                if (i === 0) {
+                    ctx.moveTo(currentX, y);
+                } else {
+                    ctx.lineTo(currentX, y);
+                }
+            }
+            ctx.stroke();
+            ctx.globalAlpha = 1.0;
+        }
+        
+        function drawMetal(ctx, x) {
+            ctx.fillStyle = '#666';
+            ctx.fillRect(x, 0, 20, 500);
+            
+            ctx.fillStyle = '#888';
+            for (let i = 0; i < 13; i++) {
+                ctx.fillRect(x + (i % 2) * 10, i * 40, 10, 20);
+            }
+        }
+        
+        function drawElectrons(ctx, frequency, intensity, metalX) {
+            const color = getWavelengthColor(frequency);
+            
+            // 金属内の電子（振動）
+            for (let i = 0; i < 10; i++) {
+                const baseX = metalX + 30;
+                const baseY = 50 + i * 45;
+                
+                // 電子の振動
+                const oscillation = Math.sin(time * frequency / 10) * intensity * 2;
+                
+                ctx.fillStyle = '#f44336';
+                ctx.beginPath();
+                ctx.arc(baseX + oscillation, baseY, 6, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // 振動の軌跡
+                ctx.strokeStyle = 'rgba(244, 67, 54, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(baseX - 15, baseY);
+                ctx.lineTo(baseX + 15, baseY);
+                ctx.stroke();
+            }
+        }
+        
+        function drawEnergyMeter(ctx, energy, threshold, x, y) {
+            const width = 200;
+            const height = 25;
+            
+            // 枠
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, width, height);
+            
+            // エネルギーバー
+            const fillWidth = (energy / threshold) * width;
+            ctx.fillStyle = energy >= threshold ? '#4caf50' : '#2196f3';
+            ctx.fillRect(x, y, Math.min(fillWidth, width), height);
+            
+            // 閾値ライン
+            ctx.strokeStyle = '#f44336';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x + width, y);
+            ctx.lineTo(x + width, y + height);
+            ctx.stroke();
+            
+            // テキスト
+            ctx.fillStyle = '#333';
+            ctx.font = '14px sans-serif';
+            ctx.fillText('エネルギー蓄積', x, y - 5);
+            ctx.fillText(`${Math.floor(energy)}/${threshold}`, x + width + 10, y + 18);
+        }
+        
+        function drawSpeedMeter(ctx, speed, maxSpeed, x, y, label) {
+            const width = 200;
+            const height = 25;
+            
+            // 枠
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, width, height);
+            
+            // 速度バー
+            const fillWidth = (speed / maxSpeed) * width;
+            const speedRatio = speed / maxSpeed;
+            
+            // 速度に応じた色のグラデーション（遅い=青、速い=赤）
+            const gradient = ctx.createLinearGradient(x, y, x + width, y);
+            gradient.addColorStop(0, '#2196f3');
+            gradient.addColorStop(0.5, '#4caf50');
+            gradient.addColorStop(1, '#f44336');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x, y, Math.min(fillWidth, width), height);
+            
+            // テキスト
+            ctx.fillStyle = '#333';
+            ctx.font = '14px sans-serif';
+            ctx.fillText(label, x, y - 5);
+            ctx.fillText(`速さ: ${speed.toFixed(1)}`, x + width + 10, y + 18);
+        }
+        
+        function getElectronColor(speed, maxSpeed) {
+            // 速度に応じた色を返す（遅い=青、中=緑、速い=赤）
+            const ratio = speed / maxSpeed;
+            if (ratio < 0.33) return '#2196f3'; // 青
+            if (ratio < 0.66) return '#4caf50'; // 緑
+            return '#f44336'; // 赤
+        }
+        
+        function drawClassical() {
+            const frequency = parseInt(frequencySlider.value);
+            const intensity = parseInt(intensitySlider.value);
+            const color = getWavelengthColor(frequency);
+            
+            classicalCtx.clearRect(0, 0, classicalCanvas.width, classicalCanvas.height);
+            
+            // 懐中電灯
+            drawFlashlight(classicalCtx, 50, 100, color, intensity, true);
+            
+            // 波の描画（ライトの先端から）
+            drawWave(classicalCtx, time * 2, frequency, intensity, color, 130);
+            
+            // 金属表面
+            const metalX = 450;
+            drawMetal(classicalCtx, metalX);
+            
+            // 電子の振動
+            drawElectrons(classicalCtx, frequency, intensity, metalX);
+            
+            // エネルギー蓄積（古典論）
+            classicalEnergy += intensity * 0.2; // 強度に比例してエネルギー蓄積（遅く）
+            
+            // エネルギーメーター
+            drawEnergyMeter(classicalCtx, classicalEnergy, CLASSICAL_THRESHOLD_ENERGY, 520, 50);
+            
+            // 放出される電子の速さ（古典論：強度で決まる、振動数の影響は小さい）
+            const maxSpeed = 10;
+            const electronSpeed = 2 + (intensity * 0.7) + (frequency * 0.02); // 主に強度、振動数は少し
+            
+            // 速度メーター
+            drawSpeedMeter(classicalCtx, electronSpeed, maxSpeed, 520, 95, '放出電子の速さ（予想）');
+            
+            // 閾値に達したら放出（古典論）
+            if (classicalEnergy >= CLASSICAL_THRESHOLD_ENERGY) {
+                // 古典論：強度（明るさ）が高いほど速い電子が放出される
+                const speed = 2 + (intensity * 0.7) + (frequency * 0.02);
+                emittedElectronsClassical.push({
+                    x: metalX + 20,
+                    y: 100 + Math.random() * 300,
+                    vx: speed,
+                    vy: (Math.random() - 0.5) * 2,
+                    speed: speed
+                });
+                classicalEnergy = 0;
+            }
+            
+            // 放出電子の描画（速度で色分け）
+            emittedElectronsClassical = emittedElectronsClassical.filter(e => {
+                e.x += e.vx;
+                e.y += e.vy;
+                
+                // 速度に応じた色
+                classicalCtx.fillStyle = getElectronColor(e.speed, maxSpeed);
+                classicalCtx.beginPath();
+                classicalCtx.arc(e.x, e.y, 7, 0, Math.PI * 2);
+                classicalCtx.fill();
+                
+                // 軌跡（速度に応じた長さ）
+                classicalCtx.strokeStyle = getElectronColor(e.speed, maxSpeed);
+                classicalCtx.globalAlpha = 0.5;
+                classicalCtx.lineWidth = 2;
+                classicalCtx.beginPath();
+                classicalCtx.moveTo(e.x - e.vx * 3, e.y - e.vy * 3);
+                classicalCtx.lineTo(e.x, e.y);
+                classicalCtx.stroke();
+                classicalCtx.globalAlpha = 1.0;
+                
+                return e.x < 880;
+            });
+            
+            // ステータス更新
+            if (emittedElectronsClassical.length > 0) {
+                classicalStatus.textContent = '電子放出中！';
+                classicalStatus.className = 'status emitting';
+            } else if (classicalEnergy > 50) {
+                classicalStatus.textContent = 'エネルギー蓄積中...';
+                classicalStatus.className = 'status not-emitting';
+            } else {
+                classicalStatus.textContent = '照射開始...';
+                classicalStatus.className = 'status not-emitting';
+            }
+        }
+        
+        function drawQuantum() {
+            const frequency = parseInt(frequencySlider.value);
+            const intensity = parseInt(intensitySlider.value);
+            const color = getWavelengthColor(frequency);
+            
+            quantumCtx.clearRect(0, 0, quantumCanvas.width, quantumCanvas.height);
+            
+            // 懐中電灯
+            drawFlashlight(quantumCtx, 50, 100, color, intensity, true);
+            
+            // 波の描画（ライトの先端から）
+            drawWave(quantumCtx, time * 2, frequency, intensity, color, 130);
+            
+            // 金属表面
+            const metalX = 450;
+            drawMetal(quantumCtx, metalX);
+            
+            // 電子の振動
+            drawElectrons(quantumCtx, frequency, intensity, metalX);
+            
+            // 電子の速度（量子論：振動数のみに依存、強度には依存しない）
+            const maxSpeed = 10;
+            let electronSpeed = 0;
+            
+            if (frequency >= THRESHOLD_FREQUENCY) {
+                // 振動数が閾値を超えた分が運動エネルギーに（hν - W）
+                electronSpeed = 2 + ((frequency - THRESHOLD_FREQUENCY) / 40) * 8;
+                electronSpeed = Math.min(electronSpeed, maxSpeed);
+            }
+            
+            // 速度メーター
+            drawSpeedMeter(quantumCtx, electronSpeed, maxSpeed, 520, 50, '放出電子の速さ（実際）');
+            
+            // 振動数が閾値を超えている場合のみ放出（実際の光電効果）
+            if (frequency >= THRESHOLD_FREQUENCY) {
+                // 強度に比例した頻度で電子を放出（個数が増える）
+                if (Math.random() < intensity / 20) {
+                    // 速度は振動数のみで決まる（強度は無関係）
+                    const speed = 2 + ((frequency - THRESHOLD_FREQUENCY) / 40) * 8;
+                    emittedElectronsQuantum.push({
+                        x: metalX + 20,
+                        y: 100 + Math.random() * 300,
+                        vx: speed,
+                        vy: (Math.random() - 0.5) * 2,
+                        speed: speed
+                    });
+                }
+            }
+            
+            // 閾値表示
+            quantumCtx.fillStyle = '#333';
+            quantumCtx.font = '16px sans-serif';
+            quantumCtx.fillText(`閾値振動数: ${THRESHOLD_FREQUENCY}`, 520, 110);
+            quantumCtx.fillText(`現在の振動数: ${frequency}`, 520, 135);
+            
+            if (frequency < THRESHOLD_FREQUENCY) {
+                quantumCtx.fillStyle = '#c62828';
+                quantumCtx.font = 'bold 16px sans-serif';
+                quantumCtx.fillText('閾値未満 → 放出なし', 520, 160);
+            } else {
+                quantumCtx.fillStyle = '#2e7d32';
+                quantumCtx.font = 'bold 16px sans-serif';
+                quantumCtx.fillText('閾値以上 → 即座に放出', 520, 160);
+            }
+            
+            // 放出電子の描画（速度で色分け）
+            emittedElectronsQuantum = emittedElectronsQuantum.filter(e => {
+                e.x += e.vx;
+                e.y += e.vy;
+                
+                // 速度に応じた色
+                quantumCtx.fillStyle = getElectronColor(e.speed, maxSpeed);
+                quantumCtx.beginPath();
+                quantumCtx.arc(e.x, e.y, 7, 0, Math.PI * 2);
+                quantumCtx.fill();
+                
+                // 軌跡（速度に応じた長さ）
+                quantumCtx.strokeStyle = getElectronColor(e.speed, maxSpeed);
+                quantumCtx.globalAlpha = 0.5;
+                quantumCtx.lineWidth = 2;
+                quantumCtx.beginPath();
+                quantumCtx.moveTo(e.x - e.vx * 3, e.y - e.vy * 3);
+                quantumCtx.lineTo(e.x, e.y);
+                quantumCtx.stroke();
+                quantumCtx.globalAlpha = 1.0;
+                
+                return e.x < 880;
+            });
+            
+            // ステータス更新
+            if (frequency < THRESHOLD_FREQUENCY) {
+                quantumStatus.textContent = '振動数が低すぎる - 電子は振動するが放出されない';
+                quantumStatus.className = 'status not-emitting';
+            } else if (emittedElectronsQuantum.length > 0) {
+                quantumStatus.textContent = '電子即座に放出！';
+                quantumStatus.className = 'status emitting';
+            } else {
+                quantumStatus.textContent = '照射中（放出可能）';
+                quantumStatus.className = 'status emitting';
+            }
+        }
+        
+        function animate() {
+            time += 1;
+            drawClassical();
+            drawQuantum();
+            requestAnimationFrame(animate);
+        }
+        
+        function resetSimulation() {
+            time = 0;
+            classicalEnergy = 0;
+            emittedElectronsClassical = [];
+            emittedElectronsQuantum = [];
+        }
+        
+        frequencySlider.addEventListener('input', updateValues);
+        intensitySlider.addEventListener('input', updateValues);
+        
+        // タッチデバイスでの操作性向上
+        frequencySlider.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        intensitySlider.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+        }, { passive: false });
+        
+        updateValues();
+        resizeCanvas();
+        animate();
+    </script>
+</body>
+</html>
